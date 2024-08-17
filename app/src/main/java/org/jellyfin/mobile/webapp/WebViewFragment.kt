@@ -8,9 +8,12 @@ import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.webkit.ValueCallback
+import android.webkit.WebChromeClient.FileChooserParams
 import android.webkit.WebView
 import android.widget.Toast
-import androidx.activity.addCallback
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.view.ViewCompat
 import androidx.core.view.doOnNextLayout
@@ -31,6 +34,7 @@ import org.jellyfin.mobile.data.entity.ServerEntity
 import org.jellyfin.mobile.databinding.FragmentWebviewBinding
 import org.jellyfin.mobile.setup.ConnectFragment
 import org.jellyfin.mobile.utils.AndroidVersion
+import org.jellyfin.mobile.utils.BackPressInterceptor
 import org.jellyfin.mobile.utils.Constants
 import org.jellyfin.mobile.utils.Constants.FRAGMENT_WEB_VIEW_EXTRA_SERVER
 import org.jellyfin.mobile.utils.applyDefault
@@ -45,7 +49,7 @@ import org.jellyfin.mobile.utils.requestNoBatteryOptimizations
 import org.jellyfin.mobile.utils.runOnUiThread
 import org.koin.android.ext.android.inject
 
-class WebViewFragment : Fragment() {
+class WebViewFragment : Fragment(), BackPressInterceptor, JellyfinWebChromeClient.FileChooserListener {
     val appPreferences: AppPreferences by inject()
     private val apiClientController: ApiClientController by inject()
     private val webappFunctionChannel: WebappFunctionChannel by inject()
@@ -66,6 +70,14 @@ class WebViewFragment : Fragment() {
 
     // UI
     private var webViewBinding: FragmentWebviewBinding? = null
+
+    // External file access
+    private var fileChooserActivityLauncher: ActivityResultLauncher<Intent> = registerForActivityResult(
+        ActivityResultContracts.StartActivityForResult(),
+    ) { result ->
+        fileChooserCallback?.onReceiveValue(FileChooserParams.parseResult(result.resultCode, result.data))
+    }
+    private var fileChooserCallback: ValueCallback<Array<Uri>>? = null
 
     init {
         enableServiceWorkerWorkaround()
@@ -102,13 +114,6 @@ class WebViewFragment : Fragment() {
             }
         }
         externalPlayer = ExternalPlayer(requireContext(), this, requireActivity().activityResultRegistry)
-
-        requireActivity().onBackPressedDispatcher.addCallback(this) {
-            if (!connected || !webappFunctionChannel.goBack()) {
-                isEnabled = false
-                activity?.onBackPressed()
-            }
-        }
     }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
@@ -167,6 +172,10 @@ class WebViewFragment : Fragment() {
         }
     }
 
+    override fun onInterceptBackPressed(): Boolean {
+        return connected && webappFunctionChannel.goBack()
+    }
+
     override fun onDestroyView() {
         super.onDestroyView()
         webViewBinding = null
@@ -178,7 +187,7 @@ class WebViewFragment : Fragment() {
             return
         }
         webViewClient = jellyfinWebViewClient
-        webChromeClient = LoggingWebChromeClient()
+        webChromeClient = JellyfinWebChromeClient(this@WebViewFragment)
         settings.applyDefault()
         addJavascriptInterface(NativeInterface(requireContext()), "NativeInterface")
         addJavascriptInterface(nativePlayer, "NativePlayer")
@@ -251,5 +260,10 @@ class WebViewFragment : Fragment() {
     private fun handleError() {
         connected = false
         onSelectServer(error = true)
+    }
+
+    override fun onShowFileChooser(intent: Intent, filePathCallback: ValueCallback<Array<Uri>>) {
+        fileChooserCallback = filePathCallback
+        fileChooserActivityLauncher.launch(intent)
     }
 }

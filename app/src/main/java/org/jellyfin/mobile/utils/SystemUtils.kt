@@ -17,7 +17,6 @@ import android.os.Environment
 import android.os.PowerManager
 import android.provider.Settings
 import android.provider.Settings.System.ACCELEROMETER_ROTATION
-import androidx.appcompat.app.AppCompatActivity
 import androidx.coordinatorlayout.widget.CoordinatorLayout
 import androidx.core.content.getSystemService
 import com.google.android.material.snackbar.Snackbar
@@ -37,7 +36,7 @@ import kotlin.coroutines.suspendCoroutine
 
 fun WebViewFragment.requestNoBatteryOptimizations(rootView: CoordinatorLayout) {
     if (AndroidVersion.isAtLeastM) {
-        val powerManager: PowerManager = requireContext().getSystemService(AppCompatActivity.POWER_SERVICE) as PowerManager
+        val powerManager: PowerManager = requireContext().getSystemService(Activity.POWER_SERVICE) as PowerManager
         if (
             !appPreferences.ignoreBatteryOptimizations &&
             !powerManager.isIgnoringBatteryOptimizations(BuildConfig.APPLICATION_ID)
@@ -84,17 +83,17 @@ suspend fun MainActivity.requestDownload(uri: Uri, title: String, filename: Stri
         AlertDialog.Builder(this)
             .setTitle(R.string.network_title)
             .setMessage(R.string.network_message)
-            .setNegativeButton(R.string.wifi_only) { _, _ ->
+            .setPositiveButton(R.string.wifi_only) { _, _ ->
                 val selectedDownloadMethod = DownloadMethod.WIFI_ONLY
                 appPreferences.downloadMethod = selectedDownloadMethod
                 continuation.resume(selectedDownloadMethod)
             }
-            .setPositiveButton(R.string.mobile_data) { _, _ ->
+            .setNegativeButton(R.string.mobile_data) { _, _ ->
                 val selectedDownloadMethod = DownloadMethod.MOBILE_DATA
                 appPreferences.downloadMethod = selectedDownloadMethod
                 continuation.resume(selectedDownloadMethod)
             }
-            .setPositiveButton(R.string.mobile_data_and_roaming) { _, _ ->
+            .setNeutralButton(R.string.mobile_data_and_roaming) { _, _ ->
                 val selectedDownloadMethod = DownloadMethod.MOBILE_AND_ROAMING
                 appPreferences.downloadMethod = selectedDownloadMethod
                 continuation.resume(selectedDownloadMethod)
@@ -145,7 +144,6 @@ fun Context.createMediaNotificationChannel(notificationManager: NotificationMana
     }
 }
 
-@Suppress("DEPRECATION")
 fun Context.getDownloadsPaths(): List<String> = ArrayList<String>().apply {
     for (directory in getExternalFilesDirs(null)) {
         // Ignore currently unavailable shared storage

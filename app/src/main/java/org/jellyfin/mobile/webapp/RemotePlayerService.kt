@@ -11,6 +11,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.pm.ServiceInfo
 import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioManager
@@ -166,7 +167,9 @@ class RemotePlayerService : Service(), CoroutineScope {
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent == null || intent.action == null) return
+        if (intent?.action == null) {
+            return
+        }
         val action = intent.action
         if (action == Constants.ACTION_REPORT) {
             notify(intent)
@@ -261,6 +264,7 @@ class RemotePlayerService : Service(), CoroutineScope {
                 } else {
                     setPriority(Notification.PRIORITY_LOW)
                 }
+
                 setContentTitle(title?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY) })
                 setContentText(artist?.let { HtmlCompat.fromHtml(it, HtmlCompat.FROM_HTML_MODE_LEGACY) })
                 setSubText(album)
@@ -338,7 +342,18 @@ class RemotePlayerService : Service(), CoroutineScope {
             }.build()
 
             // Post notification
-            notificationManager.notify(MEDIA_PLAYER_NOTIFICATION_ID, notification)
+            if (AndroidVersion.isAtLeastQ) {
+                startForeground(
+                    MEDIA_PLAYER_NOTIFICATION_ID,
+                    notification,
+                    ServiceInfo.FOREGROUND_SERVICE_TYPE_MANIFEST,
+                )
+            } else {
+                startForeground(
+                    MEDIA_PLAYER_NOTIFICATION_ID,
+                    notification,
+                )
+            }
 
             // Activate MediaSession
             mediaSession.isActive = true

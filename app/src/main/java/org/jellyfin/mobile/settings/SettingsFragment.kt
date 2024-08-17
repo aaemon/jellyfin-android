@@ -2,6 +2,7 @@ package org.jellyfin.mobile.settings
 
 import android.content.Intent
 import android.os.Bundle
+import android.os.Environment
 import android.provider.Settings
 import android.view.LayoutInflater
 import android.view.View
@@ -23,7 +24,9 @@ import de.Maxr1998.modernpreferences.preferences.choice.SelectionItem
 import org.jellyfin.mobile.R
 import org.jellyfin.mobile.app.AppPreferences
 import org.jellyfin.mobile.databinding.FragmentSettingsBinding
+import org.jellyfin.mobile.utils.BackPressInterceptor
 import org.jellyfin.mobile.utils.Constants
+import org.jellyfin.mobile.utils.DownloadMethod
 import org.jellyfin.mobile.utils.applyWindowInsetsAsMargins
 import org.jellyfin.mobile.utils.extensions.requireMainActivity
 import org.jellyfin.mobile.utils.getDownloadsPaths
@@ -31,7 +34,7 @@ import org.jellyfin.mobile.utils.isPackageInstalled
 import org.jellyfin.mobile.utils.withThemedContext
 import org.koin.android.ext.android.inject
 
-class SettingsFragment : Fragment() {
+class SettingsFragment : Fragment(), BackPressInterceptor {
 
     private val appPreferences: AppPreferences by inject()
     private val settingsAdapter: PreferencesAdapter by lazy { PreferencesAdapter(buildSettingsScreen()) }
@@ -57,6 +60,10 @@ class SettingsFragment : Fragment() {
         }
         binding.recyclerView.adapter = settingsAdapter
         return binding.root
+    }
+
+    override fun onInterceptBackPressed(): Boolean {
+        return settingsAdapter.goBack()
     }
 
     override fun onDestroyView() {
@@ -187,12 +194,36 @@ class SettingsFragment : Fragment() {
         categoryHeader(PREF_CATEGORY_DOWNLOADS) {
             titleRes = R.string.pref_category_downloads
         }
-        val downloadsDirs: List<SelectionItem> = requireContext().getDownloadsPaths().map { path ->
+
+        val downloadMethods = listOf(
+            SelectionItem(
+                DownloadMethod.WIFI_ONLY,
+                R.string.wifi_only,
+                R.string.wifi_only_summary,
+            ),
+            SelectionItem(
+                DownloadMethod.MOBILE_DATA,
+                R.string.mobile_data,
+                R.string.mobile_data_summary,
+            ),
+            SelectionItem(
+                DownloadMethod.MOBILE_AND_ROAMING,
+                R.string.mobile_data_and_roaming,
+                R.string.mobile_data_and_roaming_summary,
+            ),
+        )
+        singleChoice(Constants.PREF_DOWNLOAD_METHOD, downloadMethods) {
+            titleRes = R.string.network_title
+        }
+
+        val downloadsDirs = requireContext().getDownloadsPaths().map { path ->
             SelectionItem(path, path, null)
         }
         singleChoice(Constants.PREF_DOWNLOAD_LOCATION, downloadsDirs) {
             titleRes = R.string.pref_download_location
-            initialSelection = appPreferences.downloadLocation
+            initialSelection = Environment
+                .getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+                .absolutePath
         }
     }
 
